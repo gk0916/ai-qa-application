@@ -17,11 +17,11 @@ export function MessageInput({
 }) {
   return (
     <div className="relative">
-      <div className="absolute left-3 top-3 flex gap-1">
+      <div className="absolute left-2 top-1/2 -translate-y-1/2">
         <Button 
           variant="ghost" 
           size="icon" 
-          className="h-8 w-8"
+          className="h-8 w-8 p-0"
           type="button"
         >
           <Paperclip className="h-4 w-4" />
@@ -31,7 +31,7 @@ export function MessageInput({
         value={value}
         onChange={(e) => onChange(e.target.value)}
         placeholder="Type your message..."
-        className="pl-14 pr-16 py-5"
+        className="pl-10 pr-10 py-4"
         onKeyDown={(e) => {
           if (e.key === 'Enter' && !e.shiftKey) {
             e.preventDefault()
@@ -39,10 +39,10 @@ export function MessageInput({
           }
         }}
       />
-      <div className="absolute right-3 top-3">
+      <div className="absolute right-2 top-1/2 -translate-y-1/2">
         <Button 
           size="icon" 
-          className="h-8 w-8"
+          className="h-8 w-8 p-0"
           onClick={onSubmit}
           disabled={!value.trim() || isLoading}
         >
