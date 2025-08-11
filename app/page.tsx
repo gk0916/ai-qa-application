@@ -1,6 +1,6 @@
 'use client'
 
-import { useState } from 'react'
+import { useState, useEffect } from 'react'
 import { Sidebar } from './components/sidebar'
 import { MessageInput } from './components/message-input'
 import { ScrollArea } from '@/components/ui/scroll-area'
@@ -30,6 +30,11 @@ type Message = {
 type Conversation = {
   id: string
   messages: Message[]
+  title?: string
+  preview?: string
+  updatedAt: Date
+  unread?: boolean
+  firstUserMessage?: string
 }
 
 export default function ChatPage() {
@@ -37,36 +42,29 @@ export default function ChatPage() {
   const [input, setInput] = useState('')
   const [isLoading, setIsLoading] = useState(false)
   const [activeConversationId, setActiveConversationId] = useState('1')
-  const [conversations, setConversations] = useState<Record<string, Conversation>>({
-    '1': {
-      id: '1',
-      messages: [
-        {
-          id: '1-1',
-          content: 'Welcome to the AI assistant...',
-          role: 'assistant',
-          timestamp: new Date(Date.now() - 86400000)
-        }
-      ]
-    },
-    '2': {
-      id: '2',
-      messages: [
-        {
-          id: '2-1',
-          content: 'Let me explain the requirements...',
-          role: 'assistant',
-          timestamp: new Date(Date.now() - 3600000)
-        },
-        {
-          id: '2-2',
-          content: 'I have some questions',
-          role: 'user',
-          timestamp: new Date(Date.now() - 1800000)
-        }
-      ]
+  const [conversations, setConversations] = useState<Record<string, Conversation>>(() => {
+    const saved = typeof window !== 'undefined' ? localStorage.getItem('conversations') : null
+    return saved ? JSON.parse(saved) : {
+      '1': {
+        id: '1',
+        title: 'Welcome',
+        preview: 'Start a new conversation',
+        updatedAt: new Date(),
+        messages: [
+          {
+            id: '1-1',
+            content: 'Welcome to the AI assistant...',
+            role: 'assistant',
+            timestamp: new Date(Date.now() - 86400000)
+          }
+        ]
+      }
     }
   })
+
+  useEffect(() => {
+    localStorage.setItem('conversations', JSON.stringify(conversations))
+  }, [conversations])
 
   const form = useForm<z.infer<typeof formSchema>>({
     resolver: zodResolver(formSchema),
@@ -91,10 +89,23 @@ export default function ChatPage() {
     if (!updatedConversations[activeConversationId]) {
       updatedConversations[activeConversationId] = {
         id: activeConversationId,
-        messages: []
+        title: input.slice(0, 20),
+        preview: input.slice(0, 50),
+        updatedAt: new Date(),
+        messages: [],
+        firstUserMessage: input
       }
     }
+
     updatedConversations[activeConversationId].messages.push(userMessage)
+    updatedConversations[activeConversationId].updatedAt = new Date()
+    
+    if (!updatedConversations[activeConversationId].firstUserMessage) {
+      updatedConversations[activeConversationId].firstUserMessage = input
+      updatedConversations[activeConversationId].title = input.slice(0, 20)
+      updatedConversations[activeConversationId].preview = input.slice(0, 50)
+    }
+
     setConversations(updatedConversations)
     setInput('')
     setIsLoading(true)
@@ -110,6 +121,7 @@ export default function ChatPage() {
       }
 
       updatedConversations[activeConversationId].messages.push(aiResponse)
+      updatedConversations[activeConversationId].updatedAt = new Date()
       setConversations(updatedConversations)
     } catch (error) {
       console.error('Error:', error)
@@ -125,13 +137,25 @@ export default function ChatPage() {
       ...prev,
       [newId]: {
         id: newId,
-        messages: []
+        title: 'New Conversation',
+        preview: 'Start typing your message...',
+        updatedAt: new Date(),
+        messages: [],
+        unread: true
       }
     }))
   }
 
   const handleSelectConversation = (id: string) => {
     setActiveConversationId(id)
+    // Mark as read when selected
+    setConversations(prev => ({
+      ...prev,
+      [id]: {
+        ...prev[id],
+        unread: false
+      }
+    }))
   }
 
   const formatDateTime = (date: Date) => {
@@ -149,6 +173,15 @@ export default function ChatPage() {
   const activeMessages = conversations[activeConversationId]?.messages || []
   const showWelcomePage = activeMessages.length === 0
 
+  const sidebarConversations = Object.values(conversations).map(conv => ({
+    id: conv.id,
+    title: conv.title || 'New Conversation',
+    preview: conv.preview || 'Start typing...',
+    updatedAt: conv.updatedAt,
+    unread: conv.unread || false,
+    firstUserMessage: conv.firstUserMessage
+  }))
+
   return (
     <div className="flex h-screen bg-background">
       <Sidebar
@@ -157,8 +190,10 @@ export default function ChatPage() {
         activeConversationId={activeConversationId}
         onNewConversation={handleNewConversation}
         onSelectConversation={handleSelectConversation}
+        conversations={sidebarConversations}
       />
 
+      {/* Rest of the component remains the same */}
       <div className="flex-1 flex flex-col">
         {showWelcomePage ? (
           <div className="flex-1 flex flex-col">
