@@ -37,7 +37,6 @@ export default function ChatPage() {
   const [input, setInput] = useState('')
   const [isLoading, setIsLoading] = useState(false)
   const [activeConversationId, setActiveConversationId] = useState('1')
-  const [isNewConversation, setIsNewConversation] = useState(false)
   const [conversations, setConversations] = useState<Record<string, Conversation>>({
     '1': {
       id: '1',
@@ -99,7 +98,6 @@ export default function ChatPage() {
     setConversations(updatedConversations)
     setInput('')
     setIsLoading(true)
-    setIsNewConversation(false)
 
     try {
       await new Promise(resolve => setTimeout(resolve, 1000))
@@ -123,12 +121,17 @@ export default function ChatPage() {
   const handleNewConversation = () => {
     const newId = Date.now().toString()
     setActiveConversationId(newId)
-    setIsNewConversation(true)
+    setConversations(prev => ({
+      ...prev,
+      [newId]: {
+        id: newId,
+        messages: []
+      }
+    }))
   }
 
   const handleSelectConversation = (id: string) => {
     setActiveConversationId(id)
-    setIsNewConversation(false)
   }
 
   const formatDateTime = (date: Date) => {
@@ -144,6 +147,7 @@ export default function ChatPage() {
   }
 
   const activeMessages = conversations[activeConversationId]?.messages || []
+  const showWelcomePage = activeMessages.length === 0
 
   return (
     <div className="flex h-screen bg-background">
@@ -156,7 +160,7 @@ export default function ChatPage() {
       />
 
       <div className="flex-1 flex flex-col">
-        {isNewConversation ? (
+        {showWelcomePage ? (
           <div className="flex-1 flex flex-col">
             {/* Brand Content (Top 1/3) */}
             <div className="flex-1 flex flex-col items-center justify-center p-8 max-h-[33vh]">
