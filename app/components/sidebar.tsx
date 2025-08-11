@@ -27,12 +27,14 @@ export function Sidebar({
   isCollapsed,
   toggleCollapse,
   activeConversationId,
-  onNewConversation
+  onNewConversation,
+  onSelectConversation
 }: {
   isCollapsed: boolean
   toggleCollapse: () => void
   activeConversationId: string | null
   onNewConversation: () => void
+  onSelectConversation: (id: string) => void
 }) {
   const [searchQuery, setSearchQuery] = useState('')
   const [conversations, setConversations] = useState<Conversation[]>([
@@ -40,16 +42,47 @@ export function Sidebar({
       id: '1',
       title: 'Getting Started',
       preview: 'Welcome to the AI assistant...',
-      updatedAt: new Date(),
+      updatedAt: new Date(Date.now() - 86400000),
       unread: false
     },
-    // More sample conversations...
+    {
+      id: '2',
+      title: 'Project Discussion',
+      preview: 'Let me explain the requirements...',
+      updatedAt: new Date(Date.now() - 3600000),
+      unread: true
+    }
   ])
+
+  const handleNewConversation = () => {
+    const newConversation = {
+      id: Date.now().toString(),
+      title: 'New Conversation',
+      preview: 'Start typing your message...',
+      updatedAt: new Date(),
+      unread: true
+    }
+    setConversations([newConversation, ...conversations])
+    onNewConversation()
+    onSelectConversation(newConversation.id)
+  }
 
   const filteredConversations = conversations.filter(conv => 
     conv.title.toLowerCase().includes(searchQuery.toLowerCase()) ||
     conv.preview.toLowerCase().includes(searchQuery.toLowerCase())
   )
+
+  const formatDate = (date: Date) => {
+    return new Intl.DateTimeFormat('zh-CN', {
+      year: 'numeric',
+      month: '2-digit',
+      day: '2-digit',
+      hour: '2-digit',
+      minute: '2-digit',
+      second: '2-digit',
+      hour12: false
+    }).format(date).replace(/\//g, '-')
+  }
 
   return (
     <div className={cn(
@@ -86,7 +119,7 @@ export function Sidebar({
       <div className="flex-1 flex flex-col p-2 space-y-2">
         {!isCollapsed && (
           <Button 
-            onClick={onNewConversation}
+            onClick={handleNewConversation}
             className="w-full justify-start gap-2"
           >
             <Plus className="h-4 w-4" />
@@ -97,7 +130,7 @@ export function Sidebar({
           <Button 
             variant="ghost"
             size="icon"
-            onClick={onNewConversation}
+            onClick={handleNewConversation}
             className="w-full"
             title="New Conversation"
           >
@@ -138,6 +171,7 @@ export function Sidebar({
                   "w-full justify-start gap-2 h-auto py-2 px-3",
                   isCollapsed && "justify-center"
                 )}
+                onClick={() => onSelectConversation(conv.id)}
               >
                 {!isCollapsed && (
                   <>
@@ -146,6 +180,9 @@ export function Sidebar({
                       <p className="truncate font-medium">{conv.title}</p>
                       <p className="truncate text-xs text-muted-foreground">
                         {conv.preview}
+                      </p>
+                      <p className="text-xs text-muted-foreground mt-1">
+                        {formatDate(conv.updatedAt)}
                       </p>
                     </div>
                     {conv.unread && (

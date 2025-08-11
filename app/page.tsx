@@ -27,13 +27,47 @@ type Message = {
   timestamp: Date
 }
 
+type Conversation = {
+  id: string
+  messages: Message[]
+}
+
 export default function ChatPage() {
   const [isSidebarCollapsed, setIsSidebarCollapsed] = useState(false)
-  const [messages, setMessages] = useState<Message[]>([])
   const [input, setInput] = useState('')
   const [isLoading, setIsLoading] = useState(false)
   const [activeConversationId, setActiveConversationId] = useState('1')
-  const [isNewConversation, setIsNewConversation] = useState(true)
+  const [isNewConversation, setIsNewConversation] = useState(false)
+  const [conversations, setConversations] = useState<Record<string, Conversation>>({
+    '1': {
+      id: '1',
+      messages: [
+        {
+          id: '1-1',
+          content: 'Welcome to the AI assistant...',
+          role: 'assistant',
+          timestamp: new Date(Date.now() - 86400000)
+        }
+      ]
+    },
+    '2': {
+      id: '2',
+      messages: [
+        {
+          id: '2-1',
+          content: 'Let me explain the requirements...',
+          role: 'assistant',
+          timestamp: new Date(Date.now() - 3600000)
+        },
+        {
+          id: '2-2',
+          content: 'I have some questions',
+          role: 'user',
+          timestamp: new Date(Date.now() - 1800000)
+        }
+      ]
+    }
+  })
 
   const form = useForm<z.infer<typeof formSchema>>({
     resolver: zodResolver(formSchema),
@@ -48,13 +82,21 @@ export default function ChatPage() {
     if (!input.trim()) return
 
     const userMessage: Message = {
-      id: Date.now().toString(),
+      id: `${activeConversationId}-${Date.now()}`,
       content: input,
       role: 'user',
       timestamp: new Date()
     }
 
-    setMessages(prev => [...prev, userMessage])
+    const updatedConversations = {...conversations}
+    if (!updatedConversations[activeConversationId]) {
+      updatedConversations[activeConversationId] = {
+        id: activeConversationId,
+        messages: []
+      }
+    }
+    updatedConversations[activeConversationId].messages.push(userMessage)
+    setConversations(updatedConversations)
     setInput('')
     setIsLoading(true)
     setIsNewConversation(false)
@@ -63,13 +105,14 @@ export default function ChatPage() {
       await new Promise(resolve => setTimeout(resolve, 1000))
       
       const aiResponse: Message = {
-        id: (Date.now() + 1).toString(),
+        id: `${activeConversationId}-${Date.now() + 1}`,
         content: `I received: "${input}". This is a simulated response.`,
         role: 'assistant',
         timestamp: new Date()
       }
 
-      setMessages(prev => [...prev, aiResponse])
+      updatedConversations[activeConversationId].messages.push(aiResponse)
+      setConversations(updatedConversations)
     } catch (error) {
       console.error('Error:', error)
     } finally {
@@ -78,10 +121,29 @@ export default function ChatPage() {
   }
 
   const handleNewConversation = () => {
-    setMessages([])
-    setActiveConversationId(Date.now().toString())
+    const newId = Date.now().toString()
+    setActiveConversationId(newId)
     setIsNewConversation(true)
   }
+
+  const handleSelectConversation = (id: string) => {
+    setActiveConversationId(id)
+    setIsNewConversation(false)
+  }
+
+  const formatDateTime = (date: Date) => {
+    return new Intl.DateTimeFormat('zh-CN', {
+      year: 'numeric',
+      month: '2-digit',
+      day: '2-digit',
+      hour: '2-digit',
+      minute: '2-digit',
+      second: '2-digit',
+      hour12: false
+    }).format(date).replace(/\//g, '-')
+  }
+
+  const activeMessages = conversations[activeConversationId]?.messages || []
 
   return (
     <div className="flex h-screen bg-background">
@@ -90,6 +152,7 @@ export default function ChatPage() {
         toggleCollapse={() => setIsSidebarCollapsed(!isSidebarCollapsed)}
         activeConversationId={activeConversationId}
         onNewConversation={handleNewConversation}
+        onSelectConversation={handleSelectConversation}
       />
 
       <div className="flex-1 flex flex-col">
@@ -168,7 +231,7 @@ export default function ChatPage() {
         ) : (
           <ScrollArea className="flex-1 p-4">
             <div className="space-y-6 max-w-3xl mx-auto">
-              {messages.map(message => (
+              {activeMessages.map(message => (
                 <div 
                   key={message.id}
                   className={`flex ${message.role === 'user' ? 'justify-end' : 'justify-start'}`}
@@ -187,7 +250,7 @@ export default function ChatPage() {
                     )}>
                       <p>{message.content}</p>
                       <p className="text-xs mt-1 opacity-80">
-                        {message.timestamp.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
+                        {formatDateTime(message.timestamp)}
                       </p>
                     </div>
                   </div>
