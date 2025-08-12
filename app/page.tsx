@@ -37,6 +37,22 @@ type Conversation = {
   firstUserMessage?: string
 }
 
+function parseConversations(data: any): Record<string, Conversation> {
+  const result: Record<string, Conversation> = {};
+  for (const key in data) {
+    const conv = data[key];
+    result[key] = {
+      ...conv,
+      updatedAt: new Date(conv.updatedAt),
+      messages: conv.messages.map((msg: any) => ({
+        ...msg,
+        timestamp: new Date(msg.timestamp)
+      }))
+    };
+  }
+  return result;
+}
+
 export default function ChatPage() {
   const [isSidebarCollapsed, setIsSidebarCollapsed] = useState(false)
   const [input, setInput] = useState('')
@@ -44,7 +60,7 @@ export default function ChatPage() {
   const [activeConversationId, setActiveConversationId] = useState('1')
   const [conversations, setConversations] = useState<Record<string, Conversation>>(() => {
     const saved = typeof window !== 'undefined' ? localStorage.getItem('conversations') : null
-    return saved ? JSON.parse(saved) : {
+    return saved ? parseConversations(JSON.parse(saved)) : {
       '1': {
         id: '1',
         title: 'Welcome',
@@ -159,19 +175,15 @@ export default function ChatPage() {
   }
 
   const formatDateTime = (date: Date) => {
-		try {
-			 return new Intl.DateTimeFormat('zh-CN', {
-		      year: 'numeric',
-		      month: '2-digit',
-		      day: '2-digit',
-		      hour: '2-digit',
-		      minute: '2-digit',
-		      second: '2-digit',
-		      hour12: false
-		    }).format(date).replace(/\//g, '-')
-		} catch (error) {
-			return null
-		}
+    return new Intl.DateTimeFormat('zh-CN', {
+      year: 'numeric',
+      month: '2-digit',
+      day: '2-digit',
+      hour: '2-digit',
+      minute: '2-digit',
+      second: '2-digit',
+      hour12: false
+    }).format(date).replace(/\//g, '-')
   }
 
   const activeMessages = conversations[activeConversationId]?.messages || []
@@ -197,7 +209,6 @@ export default function ChatPage() {
         conversations={sidebarConversations}
       />
 
-      {/* Rest of the component remains the same */}
       <div className="flex-1 flex flex-col">
         {showWelcomePage ? (
           <div className="flex-1 flex flex-col">
