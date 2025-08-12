@@ -1,6 +1,6 @@
 'use client'
 
-import { useState } from 'react'
+import { useState, useEffect } from 'react'
 import { 
   Search, 
   Settings, 
@@ -31,16 +31,18 @@ export function Sidebar({
   activeConversationId,
   onNewConversation,
   onSelectConversation,
-  conversations = [] // Add default empty array
+  conversations = []
 }: {
   isCollapsed: boolean
   toggleCollapse: () => void
   activeConversationId: string | null
   onNewConversation: () => void
   onSelectConversation: (id: string) => void
-  conversations?: Conversation[] // Make prop optional
+  conversations?: Conversation[]
 }) {
   const [searchQuery, setSearchQuery] = useState('')
+  const [isHovered, setIsHovered] = useState(false)
+  const [isForcedOpen, setIsForcedOpen] = useState(false)
 
   const handleNewConversation = () => {
     const newConversation = {
@@ -55,21 +57,24 @@ export function Sidebar({
     onSelectConversation(newConversation.id)
   }
 
-  const filteredConversations = conversations.filter(conv => 
-    conv.title.toLowerCase().includes(searchQuery.toLowerCase()) ||
-    conv.preview.toLowerCase().includes(searchQuery.toLowerCase())
-  )
+  const filteredConversations = conversations
+    .filter(conv => conv.title.toLowerCase().includes(searchQuery.toLowerCase()))
+    .sort((a, b) => b.updatedAt.getTime() - a.updatedAt.getTime())
 
   const formatDate = (date: Date) => {
-    return new Intl.DateTimeFormat('zh-CN', {
-      year: 'numeric',
-      month: '2-digit',
-      day: '2-digit',
-      hour: '2-digit',
-      minute: '2-digit',
-      second: '2-digit',
-      hour12: false
-    }).format(date).replace(/\//g, '-')
+    try {
+      return new Intl.DateTimeFormat('zh-CN', {
+        year: 'numeric',
+        month: '2-digit',
+        day: '2-digit',
+        hour: '2-digit',
+        minute: '2-digit',
+        second: '2-digit',
+        hour12: false
+      }).format(date).replace(/\//g, '-')
+    } catch (error) {
+      return null
+    }
   }
 
   const getConversationTitle = (conv: Conversation) => {
@@ -86,20 +91,36 @@ export function Sidebar({
     return conv.preview
   }
 
+  const handleItemClick = (id: string) => {
+    if (isCollapsed && !isForcedOpen) {
+      setIsForcedOpen(true)
+    }
+    onSelectConversation(id)
+  }
+
   return (
-    <div className={cn(
-      "flex flex-col border-r bg-background h-full transition-all duration-300 ease-in-out",
-      isCollapsed ? "w-[70px]" : "w-64"
-    )}>
+    <div 
+      className={cn(
+        "flex flex-col border-r bg-background h-full transition-all duration-300 ease-in-out",
+        isCollapsed ? "w-[70px]" : "w-64",
+        isHovered && isCollapsed && "w-64"
+      )}
+      onMouseEnter={() => setIsHovered(true)}
+      onMouseLeave={() => {
+        setIsHovered(false)
+        if (!isForcedOpen) {
+          setIsHovered(false)
+        }
+      }}
+    >
       {/* Header */}
       <div className="flex items-center justify-between p-4 border-b">
-        {!isCollapsed && (
+        {(!isCollapsed || isHovered || isForcedOpen) ? (
           <div className="flex items-center gap-2">
             <Bot className="h-6 w-6 text-primary" />
             <h2 className="text-lg font-semibold">AI Assistant</h2>
           </div>
-        )}
-        {isCollapsed && (
+        ) : (
           <div className="flex justify-center w-full">
             <Bot className="h-6 w-6 text-primary" />
           </div>
@@ -107,19 +128,22 @@ export function Sidebar({
         <Button 
           variant="ghost" 
           size="icon" 
-          onClick={toggleCollapse}
+          onClick={() => {
+            toggleCollapse()
+            setIsForcedOpen(false)
+          }}
           className="h-8 w-8"
         >
           <ChevronLeft className={cn(
             "h-4 w-4 transition-transform",
-            isCollapsed && "rotate-180"
+            (isCollapsed && !isHovered && !isForcedOpen) && "rotate-180"
           )} />
         </Button>
       </div>
 
       {/* Main Content */}
       <div className="flex-1 flex flex-col p-2 space-y-2">
-        {!isCollapsed && (
+        {(!isCollapsed || isHovered || isForcedOpen) ? (
           <Button 
             onClick={handleNewConversation}
             className="w-full justify-start gap-2"
@@ -127,8 +151,7 @@ export function Sidebar({
             <Plus className="h-4 w-4" />
             New Conversation
           </Button>
-        )}
-        {isCollapsed && (
+        ) : (
           <Button 
             variant="ghost"
             size="icon"
@@ -141,7 +164,7 @@ export function Sidebar({
         )}
 
         <div className="relative">
-          {!isCollapsed ? (
+          {(!isCollapsed || isHovered || isForcedOpen) ? (
             <>
               <Search className="absolute left-3 top-3 h-4 w-4 text-muted-foreground" />
               <Input
@@ -172,19 +195,16 @@ export function Sidebar({
                     variant={activeConversationId === conv.id ? 'secondary' : 'ghost'}
                     className={cn(
                       "w-full justify-start gap-2 h-auto py-2 px-3",
-                      isCollapsed && "justify-center"
+                      (isCollapsed && !isHovered && !isForcedOpen) && "justify-center"
                     )}
-                    onClick={() => onSelectConversation(conv.id)}
+                    onClick={() => handleItemClick(conv.id)}
                   >
-                    {!isCollapsed && (
+                    {(!isCollapsed || isHovered || isForcedOpen) ? (
                       <>
                         <MessageSquare className="h-4 w-4 flex-shrink-0" />
                         <div className="flex-1 min-w-0 text-left">
                           <p className="truncate font-medium">
                             {getConversationTitle(conv)}
-                          </p>
-                          <p className="truncate text-xs text-muted-foreground">
-                            {getConversationPreview(conv)}
                           </p>
                           <p className="text-xs text-muted-foreground mt-1">
                             {formatDate(conv.updatedAt)}
@@ -194,17 +214,16 @@ export function Sidebar({
                           <span className="h-2 w-2 rounded-full bg-primary" />
                         )}
                       </>
-                    )}
-                    {isCollapsed && (
+                    ) : (
                       <MessageSquare className="h-4 w-4" />
                     )}
                   </Button>
                 </TooltipTrigger>
-                {isCollapsed && (
+                {(isCollapsed && !isHovered && !isForcedOpen) && (
                   <TooltipContent side="right">
                     <p>{getConversationTitle(conv)}</p>
                     <p className="text-xs text-muted-foreground">
-                      {getConversationPreview(conv)}
+                      {formatDate(conv.updatedAt)}
                     </p>
                   </TooltipContent>
                 )}
