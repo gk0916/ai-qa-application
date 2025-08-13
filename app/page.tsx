@@ -1,6 +1,6 @@
 'use client'
 
-import { useState, useEffect } from 'react'
+import { useState, useEffect, useRef } from 'react'
 import { Sidebar } from './components/sidebar'
 import { MessageInput } from './components/message-input'
 import { ScrollArea } from '@/components/ui/scroll-area'
@@ -53,34 +53,39 @@ function parseConversations(data: any): Record<string, Conversation> {
   return result;
 }
 
+
 export default function ChatPage() {
   const [isSidebarCollapsed, setIsSidebarCollapsed] = useState(false)
   const [input, setInput] = useState('')
   const [isLoading, setIsLoading] = useState(false)
-  const [activeConversationId, setActiveConversationId] = useState('1')
-  const [conversations, setConversations] = useState<Record<string, Conversation>>(() => {
-    const saved = typeof window !== 'undefined' ? localStorage.getItem('conversations') : null
-    return saved ? parseConversations(JSON.parse(saved)) : {
-      '1': {
-        id: '1',
-        title: 'Welcome',
-        preview: 'Start a new conversation',
-        updatedAt: new Date(),
-        messages: [
-          {
-            id: '1-1',
-            content: 'Welcome to the AI assistant...',
-            role: 'assistant',
-            timestamp: new Date(Date.now() - 86400000)
-          }
-        ]
-      }
+  const [conversations, setConversations] = useState<Record<string, Conversation>>({})
+  const [activeConversationId, setActiveConversationId] = useState('')
+  const [isHydrated, setIsHydrated] = useState(false)
+  const scrollAreaRootRef = useRef<HTMLDivElement | null>(null)
+  
+  useEffect(() => {
+    const saved = localStorage.getItem('conversations')
+    if (saved) {
+      setConversations(parseConversations(JSON.parse(saved)))
     }
-  })
+    const savedActiveId = localStorage.getItem('activeConversationId')
+    if (savedActiveId) {
+      setActiveConversationId(savedActiveId)
+    }
+    setIsHydrated(true)
+  }, [])
 
   useEffect(() => {
     localStorage.setItem('conversations', JSON.stringify(conversations))
   }, [conversations])
+
+  useEffect(() => {
+    if (activeConversationId) {
+      localStorage.setItem('activeConversationId', activeConversationId)
+    }
+  }, [activeConversationId])
+
+  
 
   const form = useForm<z.infer<typeof formSchema>>({
     resolver: zodResolver(formSchema),
@@ -101,9 +106,8 @@ export default function ChatPage() {
       timestamp: new Date()
     }
 
-    const updatedConversations = {...conversations}
-    if (!updatedConversations[activeConversationId]) {
-      updatedConversations[activeConversationId] = {
+    setConversations(prev => {
+      const conv = prev[activeConversationId] || {
         id: activeConversationId,
         title: input.slice(0, 20),
         preview: input.slice(0, 50),
@@ -111,18 +115,25 @@ export default function ChatPage() {
         messages: [],
         firstUserMessage: input
       }
-    }
 
-    updatedConversations[activeConversationId].messages.push(userMessage)
-    updatedConversations[activeConversationId].updatedAt = new Date()
-    
-    if (!updatedConversations[activeConversationId].firstUserMessage) {
-      updatedConversations[activeConversationId].firstUserMessage = input
-      updatedConversations[activeConversationId].title = input.slice(0, 20)
-      updatedConversations[activeConversationId].preview = input.slice(0, 50)
-    }
+      // 如果没有 firstUserMessage，设置它和标题预览
+      const firstUserMessage = conv.firstUserMessage || input
+      const title = conv.firstUserMessage ? conv.title : input.slice(0, 20)
+      const preview = conv.firstUserMessage ? conv.preview : input.slice(0, 50)
 
-    setConversations(updatedConversations)
+      return {
+        ...prev,
+        [activeConversationId]: {
+          ...conv,
+          messages: [...conv.messages, userMessage], // 创建新数组
+          updatedAt: new Date(),
+          firstUserMessage,
+          title,
+          preview,
+        }
+      }
+    })
+
     setInput('')
     setIsLoading(true)
 
@@ -136,9 +147,18 @@ export default function ChatPage() {
         timestamp: new Date()
       }
 
-      updatedConversations[activeConversationId].messages.push(aiResponse)
-      updatedConversations[activeConversationId].updatedAt = new Date()
-      setConversations(updatedConversations)
+      setConversations(prev => {
+        const conv = prev[activeConversationId]
+        if (!conv) return prev
+        return {
+          ...prev,
+          [activeConversationId]: {
+            ...conv,
+            messages: [...conv.messages, aiResponse], // 创建新数组
+            updatedAt: new Date()
+          }
+        }
+      })
     } catch (error) {
       console.error('Error:', error)
     } finally {
@@ -188,6 +208,28 @@ export default function ChatPage() {
 
   const activeMessages = conversations[activeConversationId]?.messages || []
   const showWelcomePage = activeMessages.length === 0
+  
+  const viewportRef = useRef<HTMLDivElement>(null);
+  useEffect(() => {
+    if (!viewportRef.current) return;
+
+    const { scrollTop, scrollHeight, clientHeight } = viewportRef.current;
+    const isNearBottom = scrollHeight - (scrollTop + clientHeight) < 100;
+
+    if (isNearBottom) {
+      // requestAnimationFrame(() => {
+        viewportRef.current?.scrollTo({
+          top: viewportRef.current.scrollHeight,
+          behavior: 'smooth',
+        });
+      // });
+    }
+  }, [activeMessages]);
+  
+  if (!isHydrated) {
+    return <div className="flex h-screen items-center justify-center">Loading...</div>
+    // return null
+  }
 
   const sidebarConversations = Object.values(conversations).map(conv => ({
     id: conv.id,
@@ -226,7 +268,7 @@ export default function ChatPage() {
             </div>
 
             {/* Config Form (Middle) */}
-            <ScrollArea className="flex-1 p-6">
+            <ScrollArea className="flex-1 p-6 min-h-0">
               <Form {...form}>
                 <form className="space-y-6 max-w-md mx-auto">
                   <FormField
@@ -283,7 +325,7 @@ export default function ChatPage() {
             </ScrollArea>
           </div>
         ) : (
-          <ScrollArea className="flex-1 p-4">
+          <ScrollArea viewportRef={viewportRef} className="flex-1 p-4 min-h-0">
             <div className="space-y-6 max-w-3xl mx-auto">
               {activeMessages.map(message => (
                 <div 

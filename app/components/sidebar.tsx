@@ -45,6 +45,22 @@ export function Sidebar({
   const [isForcedOpen, setIsForcedOpen] = useState(false)
 
   const handleNewConversation = () => {
+    // 检查是否已经有一个"New Conversation"存在
+    const hasNewConversation = conversations.some(
+      conv => conv.title === 'New Conversation' && !conv.firstUserMessage
+    )
+    
+    if (hasNewConversation) {
+      // 如果已经有一个新会话存在，直接选中它
+      const newConv = conversations.find(
+        conv => conv.title === 'New Conversation' && !conv.firstUserMessage
+      )
+      if (newConv) {
+        onSelectConversation(newConv.id)
+      }
+      return
+    }
+
     const newConversation = {
       id: Date.now().toString(),
       title: 'New Conversation',
@@ -92,12 +108,13 @@ export function Sidebar({
   }
 
   const handleItemClick = (id: string) => {
-    if (isCollapsed && !isForcedOpen) {
-      setIsForcedOpen(true)
-    }
+    // if (isCollapsed && !isForcedOpen) {
+    //   setIsForcedOpen(true)
+    // }
     onSelectConversation(id)
   }
 
+  const isExpanded = !isCollapsed || isHovered || isForcedOpen
   return (
     <div 
       className={cn(
@@ -115,7 +132,7 @@ export function Sidebar({
     >
       {/* Header */}
       <div className="flex items-center justify-between p-4 border-b">
-        {(!isCollapsed || isHovered || isForcedOpen) ? (
+        {(isExpanded) ? (
           <div className="flex items-center gap-2">
             <Bot className="h-6 w-6 text-primary" />
             <h2 className="text-lg font-semibold">AI Assistant</h2>
@@ -136,14 +153,15 @@ export function Sidebar({
         >
           <ChevronLeft className={cn(
             "h-4 w-4 transition-transform",
-            (isCollapsed && !isHovered && !isForcedOpen) && "rotate-180"
+            isCollapsed ? "rotate-180" : "rotate-0"
           )} />
         </Button>
+
       </div>
 
       {/* Main Content */}
-      <div className="flex-1 flex flex-col p-2 space-y-2">
-        {(!isCollapsed || isHovered || isForcedOpen) ? (
+      <div className="flex-1 flex flex-col p-2 space-y-2 min-h-0">
+        {(isExpanded) ? (
           <Button 
             onClick={handleNewConversation}
             className="w-full justify-start gap-2"
@@ -164,7 +182,7 @@ export function Sidebar({
         )}
 
         <div className="relative">
-          {(!isCollapsed || isHovered || isForcedOpen) ? (
+          {(isExpanded) ? (
             <>
               <Search className="absolute left-3 top-3 h-4 w-4 text-muted-foreground" />
               <Input
@@ -186,63 +204,67 @@ export function Sidebar({
           )}
         </div>
 
-        <ScrollArea className="flex-1">
-          <div className="space-y-1">
-            {filteredConversations.map((conv) => (
-              <Tooltip key={conv.id}>
-                <TooltipTrigger asChild>
-                  <Button
-                    variant={activeConversationId === conv.id ? 'secondary' : 'ghost'}
-                    className={cn(
-                      "w-full justify-start gap-2 h-auto py-2 px-3",
-                      (isCollapsed && !isHovered && !isForcedOpen) && "justify-center"
-                    )}
-                    onClick={() => handleItemClick(conv.id)}
-                  >
-                    {(!isCollapsed || isHovered || isForcedOpen) ? (
-                      <>
-                        <MessageSquare className="h-4 w-4 flex-shrink-0" />
-                        <div className="flex-1 min-w-0 text-left">
-                          <p className="truncate font-medium">
-                            {getConversationTitle(conv)}
-                          </p>
-                          <p className="text-xs text-muted-foreground mt-1">
-                            {formatDate(conv.updatedAt)}
-                          </p>
-                        </div>
-                        {conv.unread && (
-                          <span className="h-2 w-2 rounded-full bg-primary" />
-                        )}
-                      </>
-                    ) : (
-                      <MessageSquare className="h-4 w-4" />
-                    )}
-                  </Button>
-                </TooltipTrigger>
-                {(isCollapsed && !isHovered && !isForcedOpen) && (
-                  <TooltipContent side="right">
-                    <p>{getConversationTitle(conv)}</p>
-                    <p className="text-xs text-muted-foreground">
-                      {formatDate(conv.updatedAt)}
-                    </p>
-                  </TooltipContent>
-                )}
-              </Tooltip>
-            ))}
-          </div>
-        </ScrollArea>
+        {(isExpanded) ? (
+          <ScrollArea className="flex-1 min-h-0">
+            <div className="space-y-1">
+              {filteredConversations.map((conv) => (
+                <Tooltip key={conv.id}>
+                  <TooltipTrigger asChild>
+                    <Button
+                      variant={activeConversationId === conv.id ? 'secondary' : 'ghost'}
+                      className={cn(
+                        "w-full justify-start gap-2 h-auto py-2 px-3",
+                        (isCollapsed && !isHovered && !isForcedOpen) && "justify-center"
+                      )}
+                      onClick={() => handleItemClick(conv.id)}
+                    >
+                      {(isExpanded) ? (
+                        <>
+                          <MessageSquare className="h-4 w-4 flex-shrink-0" />
+                          <div className="flex-1 min-w-0 text-left">
+                            <p className="truncate font-medium">
+                              {getConversationTitle(conv)}
+                            </p>
+                            <p className="text-xs text-muted-foreground mt-1">
+                              {formatDate(conv.updatedAt)}
+                            </p>
+                          </div>
+                          {conv.unread && (
+                            <span className="h-2 w-2 rounded-full bg-primary" />
+                          )}
+                        </>
+                      ) : (
+                        <MessageSquare className="h-4 w-4" />
+                      )}
+                    </Button>
+                  </TooltipTrigger>
+                  {(isCollapsed && !isHovered && !isForcedOpen) && (
+                    <TooltipContent side="right">
+                      <p>{getConversationTitle(conv)}</p>
+                      <p className="text-xs text-muted-foreground">
+                        {formatDate(conv.updatedAt)}
+                      </p>
+                    </TooltipContent>
+                  )}
+                </Tooltip>
+              ))}
+            </div>
+          </ScrollArea>
+        ) : (
+          <></>
+        )}
       </div>
 
       {/* Footer */}
-      <div className="p-2 border-t">
-        <div className="flex items-center justify-between">
-          <Button variant="ghost" size="icon" className="h-10 w-10">
-            <Settings className="h-4 w-4" />
-          </Button>
-          <Avatar className="h-10 w-10 cursor-pointer">
+      <div className={cn("p-2 border-t", isExpanded ? "" : "flex flex-col items-center gap-2")}>
+        <div className={cn("flex items-center", isExpanded ? "justify-between" : "flex-col gap-2")}>
+          <Avatar className="h-4 w-4 cursor-pointer">
             <AvatarImage src="" />
             <AvatarFallback>U</AvatarFallback>
           </Avatar>
+          <Button variant="ghost" size="icon" className="h-10 w-10">
+            <Settings className="h-4 w-4" />
+          </Button>
         </div>
       </div>
     </div>
